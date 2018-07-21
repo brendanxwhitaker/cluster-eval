@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 from matplotlib import pyplot as plt
+from unipath import Path
 import path_utilities
 import pylab as pl
 import numpy as np
@@ -166,12 +167,17 @@ def count_and_sort_exts(extensions, num_slices, write_path, dataset_path):
 ''' PARAMETERS: a list of extensions, number of pie chart slices, output path
     DOES: creates a pie chart '''
 def plot_extension_pie(extensions, num_slices, 
-                       write_path, dataset_name):
-    sorted_exts, sorted_counts = count_and_sort_exts(extensions, 
-                                                     num_slices,
-                                                    )
+                       write_path, dataset_path):
+
+    sorted_tuple = count_and_sort_exts(extensions, num_slices,
+                                       write_path, dataset_path)
+    sorted_exts, sorted_counts = sorted_tuple
+    print("length of sorted_exts: ",len(sorted_exts))
+    dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
     labels = []
     sizes = []
+    if (len(sorted_exts) < num_slices):
+        num_slices = len(sorted_exts)
     for x in range(num_slices):
         labels.append(sorted_exts[x])
         sizes.append(sorted_counts[x])
@@ -191,7 +197,7 @@ def plot_extensions(dataset_path, num_extensions):
     
     allpaths = DFS.DFS(dataset_path) 
     p = Path(os.getcwd()).parent
-    dataset_name = get_last_dir_from_path(dataset_path)
+    dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
     write_path = os.path.join(p, "outputs/", dataset_name + "--output/")
     if not os.path.isdir(write_path):
         os.mkdir(write_path)
@@ -199,9 +205,9 @@ def plot_extensions(dataset_path, num_extensions):
     # a list of all the file names (without the paths)
     filenames = []
     for path in allpaths:
-        filenames.append(DFS.get_fname_from_path(path))
+        filenames.append(path_utilities.get_fname_from_path(path))
     filenames_no_ext, exts = remove_all_extensions(filenames) 
-    plot_extension_pie(exts, num_extensions, write_path, dataset_name)
+    plot_extension_pie(exts, num_extensions, write_path, dataset_path)
 
     '''
     filenames_path = os.path.join(write_path, "filenames_" 
