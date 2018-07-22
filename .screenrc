@@ -1,0 +1,16 @@
+vbell on
+vbell_msg ''
+termcapinfo *  vb=:
+
+
+# Automatically detach on hangup. 
+autodetach on
+
+# Change default scrollback value for new windows
+defscrollback 10000
+
+# Window statusbar
+hardstatus alwaysfirstline "%{kb}%{c}[%{w}%D %d/%m/%Y %c:%s%{c}] %{w}%-w%{rk}%n %t%{wb}%+w %=%{c}[%{W}%H %l%{c}]"
+
+# Allow editors to erase old text from terminal history on exit
+altscreen on
