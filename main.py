@@ -15,34 +15,37 @@ def main():
     print("ARGUMENTS: ")
     args = load_arguments()
     print("Arguments loaded. ")
-   
-    # num_clusters_text
-    # overwrite_tokens
 
-    if args.reconvert == 'y' or args.reconvert == 'Y':
-        tokenizer.plot_extensions(
-                                  args.dataset_path,
-                                  args.num_extensions,
-                                 )  
-    if args.reconvert == 'y' or args.reconvert == 'Y':
-        converting_utilities.convert(
-                                     args.dataset_path, 
-                                     args.num_extensions, 
-                                    ) 
-    if args.cluster_tables == 'y' or args.cluster_tables == 'Y':
-        schema_clustering.runflow(
-                                  args.dataset_path, 
-                                  args.num_clusters_tabular, 
-                                  args.overwrite_distmat_tabular, 
-                                  args.overwrite_plot_tabular,
-                                  args.fill_threshold,
-                                 )
-    if args.cluster_text == 'y' or args.cluster_text == 'Y':
-        document_clustering.runflow(args.num_clusters_text, 
-                                    args.overwrite_tokens_text,
-                                    args.overwrite_clusters_text,
-                                    args.dataset_path)
-    
+    if args.num_clusters_end < args.num_clusters_start:
+        args.num_clusters_end = args.num_clusters_start
+   
+    if args.plot_extensions.lower() == 'y':
+        tokenizer.plot_extensions(args.dataset_path,
+                                  args.num_extensions)
+
+    if args.convert.lower() == 'y':
+        converting_utilities.convert(args.dataset_path, 
+                                     args.num_extensions)
+
+    start = args.num_clusters_start
+    end = args.num_clusters_end
+    num_clusters = start
+
+    print("Clustering for all k: " + str(start) + "<=k<=" + str(end) + "...\n")
+    while num_clusters <= end:
+        if args.cluster_struct.lower() == 'y':
+            schema_clustering.runflow(args.dataset_path, 
+                                      num_clusters, 
+                                      args.overwrite_distmat_struct, 
+                                      args.overwrite_plot_struct,
+                                      args.fill_threshold)
+
+        if args.cluster_text.lower() == 'y':
+            document_clustering.runflow(num_clusters, 
+                                        args.overwrite_tokens_text,
+                                        args.overwrite_clusters_text,
+                                        args.dataset_path)
+        num_clusters += 1
  
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here

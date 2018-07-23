@@ -13,11 +13,11 @@ def compute_silhouette(cluster_directories, dataset_path):
         return 0
 
     max_dist = calculate_file_distances.naive_max_dist(dataset_path)
-    #print("max_dist: ", max_dist)
+    # print("max_dist: ", max_dist)
     silhouette_list = []
     total_num_files = 0
     total_silhouette_sum = 0
-    print("Calculating silhouette scores...")
+    # print("Calculating silhouette scores...")
     for cluster_i in cluster_directories:
         num_files_i = 0
         silhouette_sum_i = 0
@@ -33,7 +33,7 @@ def compute_silhouette(cluster_directories, dataset_path):
                         # Make sure this function normalizes
                         # get the distance between the two dirs
                         xy_dist = tree_dist(dir_x, dir_y, max_dist)
-                        #print("distance between ", dir_x," and ", dir_y," :", xy_dist)
+                        # print("distance between ", dir_x," and ", dir_y," :", xy_dist)
                         # multiply by the y count to add to the sum
                         # since we have "count_y" files in this dir
                         # to take dist with. 
@@ -49,7 +49,7 @@ def compute_silhouette(cluster_directories, dataset_path):
                     mean_x_j = total_dist_j / total_count_j
                     set_of_means_x.append(mean_x_j)
             min_mean_x = min(set_of_means_x)
-            #print("min_mean_x: ", min_mean_x)
+            # print("min_mean_x: ", min_mean_x)
             
             # COMPUTE INTRACLUSTER DISTANCE
             total_count_i = 0
@@ -57,7 +57,7 @@ def compute_silhouette(cluster_directories, dataset_path):
             for dir_y, count_y in cluster_i.items():
                 if (dir_y != dir_x):
                     xy_dist = tree_dist(dir_x, dir_y, max_dist)
-                    #print("distance between ", dir_x," and ", dir_y," :", xy_dist)
+                    # print("distance between ", dir_x," and ", dir_y," :", xy_dist)
                     # multiply by the y count to add to the sum
                     # since we have "count_y" files in this dir
                     # to take dist with. 
@@ -73,15 +73,15 @@ def compute_silhouette(cluster_directories, dataset_path):
             if (total_count_i == 0):
                 total_count_i = 1
             mean_x_i = total_dist_i / total_count_i
-            #print("mean_x_i: ", mean_x_i)
+            # print("mean_x_i: ", mean_x_i)
             # compute the denominator of silhouette for x
             silhouette_x_denom = max([min_mean_x, mean_x_i])
-            #print("denom: ", silhouette_x_denom)
+            # print("denom: ", silhouette_x_denom)
             # compute silhouette of x
             if (silhouette_x_denom == 0):
                 silhouette_x_denom = 1
             silhouette_x = (min_mean_x - mean_x_i) / silhouette_x_denom
-            #print("silhouette_x: ", silhouette_x)
+            # print("silhouette_x: ", silhouette_x)
             # add the silhouette for x to our sum of all silhouettes in
             # cluster i 
             silhouette_sum_i += silhouette_x * count_x
@@ -91,8 +91,8 @@ def compute_silhouette(cluster_directories, dataset_path):
         if (num_files_i == 0):
             num_files_i = 1
         silhouette_i = silhouette_sum_i / num_files_i
-        #print("silhouette_sum_i: ", silhouette_sum_i)
-        #print("num_files_i: ", num_files_i)
+        # print("silhouette_sum_i: ", silhouette_sum_i)
+        # print("num_files_i: ", num_files_i)
         # keep track of the total number of files in the dataset
         total_num_files += num_files_i
         # keep track of the total silhouette sum for all clusters

@@ -2,52 +2,61 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import matplotlib.backends.backend_pdf
+
 import numpy as np
 import pandas as pd
-import silhouette
-import path_utilities
 from time import time
 from tqdm import tqdm
 from glob import glob
 from unipath import Path
 from six import string_types
 import nltk, re, os, codecs, mpld3, sys, random
+from nltk.stem.snowball import SnowballStemmer
+
 from sklearn.cluster import KMeans
 from sklearn.externals import joblib
 from sklearn import feature_extraction
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import MDS
-from nltk.stem.snowball import SnowballStemmer
 from mpl_toolkits.mplot3d import Axes3D
+
+import silhouette
+import path_utilities
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
-''' PARAM: "directory" - a parent directory containing /pdf/ /doc/ etc
+''' PARAM: "directory" - a parent directory containing pdf/ doc/ etc
            "dataset_path" - a directory leading to the dataset
     RETURNS: a list of filenames and a list of the contents of the files 
     DOES: gets all the filenames and their contents of a directory '''   
 def get_document_contents(directory, dataset_path):
-    p = Path(os.getcwd()).parent
+    # setup output path as "file_place"
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
+    
+    # load in the extension index from the output folder
     ext_dict_file_loc = os.path.join(file_place,"extension_index_" + dataset_name + ".npy") 
     ext_paths = np.load(ext_dict_file_loc).item()
     
+    # "filenames" list of the paths of files
+    # "data" list of the contents of files 
     filenames = []
     data = []
     i = 1
-        
-    # a list of the paths of the txt files still in pub8 
+    
+    # get contents of txt files still in original dataset
     txt_paths = ext_paths.get("txt")
     print("Getting .txt contents from " + dataset_path)
     for path in tqdm(txt_paths):
         if os.path.isfile(path):
             i = i+1
-            # add the filename to "filenames" 
+            # add the path of the file to "filenames" 
             filenames.append(path)
+
             # read the contents of the file and remove newlines
             fread = open(path, "r", errors='backslashreplace')
             contents = fread.read()
@@ -56,8 +65,9 @@ def get_document_contents(directory, dataset_path):
             # add the string of the contents of the file to "data"
             data.append(contents)
     
-    # for every file in the directory of converted files
+    # get contents of converted files in the other directory
     conv_folders = path_utilities.get_immediate_subdirectories(directory)
+    # for each folder in the directory (e.g. pdf/ doc/)
     for folder in conv_folders:
         filetype = path_utilities.get_last_dir_from_path(folder)
         if filetype in ["pdf", "doc", "docx"]: #, "xml", "html"]:
@@ -69,6 +79,7 @@ def get_document_contents(directory, dataset_path):
                     # add the non-converted filename to "filenames" 
                     new_name = path_utilities.str_decode(path_utilities.remove_extension(filename))
                     filenames.append(new_name)
+
                     # read the contents of the file and remove newlines
                     fread = open(cur_file, "r", errors='backslashreplace')
                     contents = fread.read()
@@ -77,41 +88,39 @@ def get_document_contents(directory, dataset_path):
                     # add the string of the file contents to "data"
                     data.append(contents)
     
-    print("num total files: ", i)
+    print("Num total files: ", i)
     print("All directory contents retrieved")
     return filenames, data
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETER: the text of a document
-    RETURN: list of stems
+    RETURN: list of filtered tokens and a list of stems
     DOES: splits a document into a list of tokens & stems each token '''
 def tokenize_and_stem(text):
     stemmer = SnowballStemmer("english")
     # tokenize by sentence, then by word so punctuation is its own token
     tokens = [word for sent in nltk.sent_tokenize(text) for word in nltk.word_tokenize(sent)]
-    filtered_tokens = []
+    
     # filter out tokens without letters (e.g., numbers, punctuation)
+    filtered_tokens = []
     for token in tokens:
         if re.search('[a-zA-Z]', token):
+            # removes tokens with length 1
             if len(token)>1:
                filtered_tokens.append(token)
+    
+    # stems the tokens
     stems = [stemmer.stem(t) for t in filtered_tokens]
-    return stems
+    
+    return filtered_tokens, stems
 
 ''' PARAMETER: the text of a document
-    RETURN: a list of filtered tokens
-    DOES: tokenizes the document only (doesn't stem) '''
-def tokenize_only(text):
-    # tokenize by sentence, then by word so punctuation is its own token
-    tokens = [word.lower() for sent in nltk.sent_tokenize(text) for word in nltk.word_tokenize(sent)]
-    filtered_tokens = []
-    # filter out tokens without letters (e.g., numbers, punctuation)
-    for token in tokens:
-        if re.search('[a-zA-Z]', token):
-            if len(token)>1:
-                filtered_tokens.append(token)
-    return filtered_tokens
+    RETURN: a list of stems
+    DOES: for use with Tfidf Vectorizer '''
+def tokenize_and_stem_call(text):
+    ft, stems = tokenize_and_stem(text)
+    return stems
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
@@ -119,11 +128,15 @@ def tokenize_only(text):
     RETURNS: a list of filenames and a list of file data
     DOES: retokenizes and catches errors '''
 def to_retokenize(retokenize, corpusdir, dataset_path): 
-    p = Path(os.getcwd()).parent
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
+    
+    # "fnames" is a list of the paths of each file in the  source dataset
+    # "dataset" is a list of strings, each containing a document's text
+    fnames, dataset = get_document_contents(corpusdir, dataset_path)
     
     if retokenize == "0":
         print("\nAttempting to bypass retokenizing...")
@@ -136,22 +149,15 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
             print("One or more dependencies is missing... \nRetokenizing...")
             retokenize = "1"
             
-    if retokenize == "1": 
-        # "fnames" is a list of the paths of each file in the  source dataset
-        # "dataset" is a list of strings, each containing a document's text
-        fnames, dataset = get_document_contents(corpusdir, dataset_path)
-        
+    if retokenize == "1":     
         print("\nTokenizing", len(dataset), "documents...")
         totalvocab_stemmed = []
         totalvocab_tokenized = []
         for i in tqdm(dataset):
-            # for each item in the dataset, tokenize/stem
-            allwords_stemmed = tokenize_and_stem(i)
-            # extend "totalvocab_stemmed" 
-            totalvocab_stemmed.extend(allwords_stemmed)
-            
-            # for each item in the dataset, tokenize only
-            allwords_tokenized = tokenize_only(i)
+            # for each item in the dataset, tokenize and stem
+            allwords_tokenized, allwords_stemmed = tokenize_and_stem(i)
+            # extend "totalvocab_stemmed" and "totalvocab_tokenized"
+            totalvocab_stemmed.extend(allwords_stemmed) 
             totalvocab_tokenized.extend(allwords_tokenized)
 
         # create vocab_frame with "totalvocab_stemmed" or "totalvocab_tokenized"
@@ -161,9 +167,9 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
         print('There are ' + str(vocab_frame.shape[0]) + ' items in vocab_frame')
 
         #define vectorizer parameters
-        tfidf_vectorizer = TfidfVectorizer(max_df=0.70, max_features=200000,
-                              min_df=0.15, stop_words='english', use_idf=True, 
-                              tokenizer=tokenize_and_stem, ngram_range=(1,3))
+        tfidf_vectorizer = TfidfVectorizer(max_df=1.0, max_features=200000,
+                              min_df=1, stop_words='english', use_idf=True, 
+                              tokenizer=tokenize_and_stem_call, ngram_range=(1,3))
         
         #fits the vectorizer to the dataset
         print("\nFitting vectorizer to data...")
@@ -175,19 +181,16 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
         np.save(os.path.join(file_place, "distance_matrix_" + dataset_name + ".npy"), dist)
         print("Vectorizer fitted to data")
         
-        file_contents = [fnames, dataset]
-        np.save(os.path.join(file_place, "file_contents_" + dataset_name + ".npy"), file_contents)
-        #return fnames, dataset
-    #return 0, 0
-       
+    return fnames, dataset
+      
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETERS: parameters explained in main_function
     DOES: reclusters and catches errors '''
 def to_recluster(num_clusters, retokenize, recluster, tfidf_matrix, dataset_path):
-    p = Path(os.getcwd()).parent
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
     trailer_text = dataset_name + "_k=" + str(num_clusters)
@@ -233,9 +236,9 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
     #nltk.download('punkt')
     stemmer = SnowballStemmer("english")
 
-    p = Path(os.getcwd()).parent
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
     trailer_text = dataset_name + "_k=" + str(num_clusters)
@@ -244,16 +247,13 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
     
     #=========1=========2=========3=========4=========5=========6=======
     
-    to_retokenize(retokenize, corpusdir, dataset_path)
+    fnames, dataset = to_retokenize(retokenize, corpusdir, dataset_path)
     tfidf_matrix = np.load(os.path.join(file_place, "tfidf_matrix_" + dataset_name + ".npy")).item()
-    file_contents = np.load(os.path.join(file_place, "file_contents_" + dataset_name + ".npy"))
-    fnames = file_contents[0,:].tolist()
-    dataset = file_contents[1,:].tolist()
     to_recluster(num_clusters, retokenize, recluster, tfidf_matrix, dataset_path)
     
     km = joblib.load(os.path.join(file_place, 'doc_cluster_' + trailer_text + '.pkl'))
     vocab_frame = pd.read_pickle(os.path.join(file_place, "vocab_frame_" + dataset_name + ".pkl"))
-    terms = np.load(os.path.join(file_place, "terms_" + dataset_name + ".npy"))
+    terms = np.load(os.path.join(file_place, "terms_" + dataset_name + ".npy")).tolist()
     dist = np.load(os.path.join(file_place, "distance_matrix_" + dataset_name + ".npy"))
     print("\nLoaded in existing cluster profile...\n")
 
@@ -292,7 +292,8 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
 
     all_cluster_words = {}
     # for each cluster
-    
+
+ 
     distinct_cluster_labels = sorted(distinct_cluster_labels)
     for i in distinct_cluster_labels:
         fwriter.write("Cluster " + str(i) + " words: ")
@@ -303,18 +304,20 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
         for ind in order_centroids[i, :]: 
             test_var = vocab_frame.ix[terms[ind].split(" ")].values.tolist()[0]
             cluster_words.append(test_var[0])
-        cluster_words = list(set(tuple(cluster_words)))
-        #print("cluster words", cluster_words)
-
+        
+        cluster_words = unique(cluster_words)
+    
         # print the first "n_words" words in a cluster
         #for ind in order_centroids[i, : n_words]:
-        for ind in range(n_words):
+        print(min(n_words, len(cluster_words)))
+        for ind in range(min(n_words, len(cluster_words))):
             #print("fuck mylife -  ")
             #test_var = vocab_frame.ix[terms[ind].split(" ")].values.tolist()[0]
             print(' %s' % cluster_words[ind], end=",")  
+            fwriter.write(cluster_words[ind].rstrip("\n") + ", ")
             #print(' %s' % vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0], end=",")
-            fwriter.write(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].rstrip('\n') + ", ")
-            cluster_words.append(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0])
+            #fwriter.write(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].rstrip('\n') + ", ")
+            #cluster_words.append(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0])
         print()
         fwriter.write("\n")
          
@@ -364,6 +367,9 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
            
     return frame, all_cluster_words, distinct_cluster_labels
 
+def unique(sequence):
+    seen = set()
+    return [x for x in sequence if not (x in seen or seen.add(x))]
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETERS: "frame" - a dataframe containing which files are in which clusters
@@ -377,9 +383,9 @@ def bar_clusters(frame, distinct_cluster_labels, num_clusters, home_dir, dataset
   
     matplotlib.rcParams.update({'font.size': 4})
     
-    p = Path(os.getcwd()).parent
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
     trailer_text = dataset_name + "_k=" + str(num_clusters)
@@ -467,9 +473,9 @@ def get_cluster_stats(one_cluster_directories):
     return unique+"\n"+avg+"\n"+med+"\n"+std+"\n"+nsd
 
 def print_cluster_stats(top_words, frame, dataset_path, num_clusters):
-    p = Path(os.getcwd()).parent
+    p = Path(Path(os.getcwd()).parent).parent
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
-    file_place = os.path.join(p, "outputs/", dataset_name + "--output")    
+    file_place = os.path.join(p, "cluster-datalake-outputs/", dataset_name + "--output")    
     if not os.path.isdir(file_place):
         os.mkdir(file_place)
     trailer_text = dataset_name + "_k=" + str(num_clusters)
@@ -516,7 +522,7 @@ def runflow(num_clusters, retokenize, recluster, dataset_path):
     print_cluster_stats(all_cluster_words, fr, dataset_path, num_clusters)
     
     # print total time taken to run program
-    print("Time taken: ", time()-t0, " seconds")
+    print("\nTime taken: ", time()-t0, " seconds\n")
 
 if __name__ == "__main__":
     # stuff only to run when not called via 'import' here

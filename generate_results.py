@@ -1,3 +1,4 @@
+from frequencydrop import compute_freqdrop_score
 from silhouette import compute_silhouette
 import get_cluster_stats as get_stats
 from matplotlib import pyplot as plt
@@ -21,6 +22,9 @@ def generate_results(filename_header_pairs, labels, num_clusters,
     #            "cluster_directories": list of dicts, one per cluster, 
     #            keys are unique directories, values are counts
     #===================================================================
+    print("Creating list of filepaths for each cluster. ")
+    print("Creating list of dicts which "
+          + "map directories to frequencies. ") 
  
     # create a dict mapping cluster indices to lists of filepaths
     cluster_filepath_dict = {}
@@ -78,7 +82,8 @@ def generate_results(filename_header_pairs, labels, num_clusters,
     #===================================================================
     #=#BLOCK#=#: Prints cluster information to .pdf and .txt files.  
     #===================================================================
-    
+    print("Printing cluster info to .txt and .pdf files. ")   
+ 
     # get a list of the cluster statistic for printing to pdf
     cluster_stats = get_stats.get_cluster_stats(cluster_directories)
     
@@ -90,15 +95,19 @@ def generate_results(filename_header_pairs, labels, num_clusters,
         print("Silhouette score for cluster " + str(l)+": "+str(coeff))
         l += 1
     print("Total silhouette for entire clustering: ", sil)
-    
+
+    # get the frequency drop score of the clusters
+    freqdrop_scores = compute_freqdrop_score(list_cluster_lists) 
+    freqdrop_total = sum(freqdrop_scores) / len(freqdrop_scores)   
+ 
     # just make font a bit smaller
     matplotlib.rcParams.update({'font.size': 4})
     print("\n\nGenerating barcharts...")
     
     # open the pdf and text files for writing 
-    pdf_path = os.path.join(write_path, "tabular_stats_" + dataset_name 
+    pdf_path = os.path.join(write_path, "structured_stats_" + dataset_name 
                             + "_k=" + str(num_clusters) + ".pdf")
-    txt_path = os.path.join(write_path, "tabular_stats_" + dataset_name 
+    txt_path = os.path.join(write_path, "structured_stats_" + dataset_name 
                             + "_k=" + str(num_clusters) + ".txt")
     pdf = matplotlib.backends.backend_pdf.PdfPages(pdf_path)
     f = open(txt_path,'w')
@@ -137,7 +146,8 @@ def generate_results(filename_header_pairs, labels, num_clusters,
         +str(single_cluster_stats[2])+"\n"
         +"Closest common ancestor of all directories: " 
         +single_cluster_stats[4] + "\n"
-        +"Silhouette score: " + str(sil_list[k]))
+        +"Silhouette score: " + str(sil_list[k]) + "\n"
+        + "Frequency drop score: " + str(freqdrop_scores[k]))
         plt.title(fig_title)
         plt.xlabel('Directory')
         plt.ylabel('Quantity of files in directory')
@@ -149,7 +159,8 @@ def generate_results(filename_header_pairs, labels, num_clusters,
         f.write(fig_title)
         f.write("\n\n")
     
-    f.write("total_silhouette: " + str(sil))
+    f.write("Total_silhouette: " + str(sil))
+    f.write("Total_frequency drop: " + str(freqdrop_total))
     f.close()
     pdf.close()
-    return
+    return list_cluster_lists

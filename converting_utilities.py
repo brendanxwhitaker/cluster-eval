@@ -117,7 +117,7 @@ def convert_xml(xml_paths, dest):
 #=========1=========2=========3=========4=========5=========6=========7=
 
 # RETURNS: list of filepaths which are candidates for conversion.
-def get_valid_filenames_tabular(dir_list):
+def get_valid_filenames_struct(dir_list):
     print("size of virtual directory: ", len(dir_list))
     list_valid_exts = [".xls", ".xlsx", ".tsv"]
     list_caps_exts = {".XLS":".xls", ".XLSX":".xlsx", ".TSV":".tsv"}
@@ -235,15 +235,15 @@ def convert(dataset_path, num_top_exts):
     
     if "xls" in ext_locations:
         xls_paths = ext_locations.get("xls")
-        valid_xls = get_valid_filenames_tabular(xls_paths)
+        valid_xls = get_valid_filenames_struct(xls_paths)
         convert_tabular(valid_xls, csv_dest)
     if "xlsx" in ext_locations:
         xlsx_paths = ext_locations.get("xlsx")
-        valid_xlsx = get_valid_filenames_tabular(xlsx_paths)
+        valid_xlsx = get_valid_filenames_struct(xlsx_paths)
         convert_tabular(valid_xlsx, csv_dest)
     if "tsv" in ext_locations:
         tsv_paths = ext_locations.get("tsv")
-        valid_tsv = get_valid_filenames_tabular(tsv_paths)
+        valid_tsv = get_valid_filenames_struct(tsv_paths)
         #convert_tabular(valid_tsv, csv_dest)
     
 def main():

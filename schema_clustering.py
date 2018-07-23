@@ -1,18 +1,20 @@
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.neighbors import kneighbors_graph
+
+from path_utilities import get_last_dir_from_path 
+from attributes import get_cluster_attributes
+from generate_results import generate_results
+from plot_dendrogram import plot_dendrogram 
+from plot_clusters import plot_clusters
+from path_utilities import str_encode
+
 import matplotlib
 matplotlib.use('Agg')
 
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.neighbors import kneighbors_graph
-from generate_results import generate_results
-from plot_dendrogram import plot_dendrogram 
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.backends.backend_pdf
-import matplotlib.gridspec as gridspec
 from matplotlib import pyplot as plt
-import calculate_file_distances
-from sklearn import manifold
+
 from tqdm import tqdm
-import path_utilities
+
 import pandas as pd
 import numpy as np
 import sklearn
@@ -28,6 +30,7 @@ np.set_printoptions(threshold=np.nan)
 # Then it clusters the schemas of these .csv files using agglomerative
 # clustering. 
 
+#=========1=========2=========3=========4=========5=========6=========7=
 #=========1=========2=========3=========4=========5=========6=========7=
 
 def parse_args():
@@ -86,6 +89,7 @@ def get_header_dict(csv_dir, csv_path_list,
                     fill_threshold, converted_status):
     
     # maps filenames to csv header lists
+    print("Generating structured header dictionary. ")
     header_dict = {}
     
     # number of files with no valid header
@@ -125,7 +129,7 @@ def get_header_dict(csv_dir, csv_path_list,
         else:
             
             # convert to "@home@ljung@pub8@oceans@some_file.csv" form. 
-            filename = path_utilities.str_encode(path)
+            filename = str_encode(path)
 
         # So now in both cases, filename has the "@"s, and path is
         # the location of some copy of the file. 
@@ -194,6 +198,7 @@ def get_header_dict(csv_dir, csv_path_list,
           fill_threshold*100, 
           "% nonempty cells in every row: ", bad_files)    
     print("Number of UnicodeDecodeErrors: ", decode_probs)
+    print("Dictionary generated. ")
     return header_dict
 
 #=========1=========2=========3=========4=========5=========6=========7=
@@ -221,7 +226,8 @@ def dist_mat_generator(header_dict,
     #===================================================================
     #=#BLOCK#=#: Get paths, read from header_dict, and initialize stuff. 
     #===================================================================
-    
+    print("Getting write paths for the distance matrix. ")   
+ 
     # Define the names for the files we write distance matrix and the
     # filename_header_pairs list to.  
     dist_mat_path = os.path.join(write_path, "dist_" 
@@ -289,6 +295,7 @@ def dist_mat_generator(header_dict,
             pickle.dump(filename_header_pairs, f)
 
     else:
+        print("There is an existing distance matrix for this dataset. ")
         print("Loading file from: ", dist_mat_path)
         jacc_matrix = np.load(dist_mat_path)
         with open(headpairs_path, 'rb') as f:
@@ -306,201 +313,27 @@ def agglomerative(jacc_matrix,
                   overwrite,
                   write_path,
                   dataset_name):
+
+    print("Initializing sklearn agglomerative clustering object. ")
     clustering = AgglomerativeClustering(n_clusters=num_clusters, 
                                          affinity='precomputed', 
                                          linkage='complete')
+
+    print("Fitting model to the distance matrix. ")
     clustering.fit(jacc_matrix)
     labels = clustering.labels_
-    #print(labels)
 
     if (overwrite == 1):
+        print("Replotting dendrogram. ")
         plt.figure(figsize=(17,9))
         plot_dendrogram(clustering, labels = clustering.labels_)
         dend_path = os.path.join(write_path, 
                                  "dendrogram_" + dataset_name 
                                  + "_k=" + str(num_clusters))
         plt.savefig(dend_path, dpi=300)
-        print("dendrogram written to \"dendrogram.png\"")
+        print("Dendrogram written to \"dendrogram.png\"")
     
     return labels
-
-#=========1=========2=========3=========4=========5=========6=========7=
-#=========1=========2=========3=========4=========5=========6=========7=
-
-# DOES: plots the schema_clusters for the csv files. 
-def plot_clusters(jacc_matrix, labels, write_path, 
-                  overwrite_plot, dataset_name, num_clusters):
- 
-    plot_mat_path = os.path.join(write_path, 
-                                 "plot_" + dataset_name 
-                                 + "_k=" + str(num_clusters) + ".npy")
-    if not os.path.isfile(plot_mat_path) or overwrite_plot == "1":
-        
-        # multidimensional scaling to convert distance matrix into 3D
-        mds = manifold.MDS(n_components=3, n_jobs=4, 
-                           dissimilarity="precomputed", 
-                           random_state=1, verbose=2)
-        print("Fitting to the distance matrix. ")
-        
-        # shape (n_components, n_samples)
-        pos = mds.fit_transform(jacc_matrix)
-        np.save(plot_mat_path,pos)
-    else:
-        pos = np.load(plot_mat_path)
-    xs, ys, zs = pos[:, 0], pos[:, 1], pos[:, 2]
-
-    # set up plot
-    print("Setting up plot. ")
-    fig = plt.figure(figsize=(17,9))
-    ax = Axes3D(fig)
-
-    # create data frame with MDS results, cluster numbers, filenames
-    df = pd.DataFrame(dict(x=xs, y=ys, z=zs, label=labels)) 
-    
-    # group by cluster
-    groups = df.groupby('label')
-
-    # for each cluster, plot the files in that cluster
-    for name, group in tqdm(groups):
-            
-        # color = ('#%06X' % random.randint(0,256**3-1))
-        color = np.random.rand(3,)
-        for t in range(group.shape[0]):
-            ax.scatter(group.x.iloc[t], 
-                       group.y.iloc[t], 
-                       group.z.iloc[t], 
-                       c=color, marker='o')
-            ax.set_aspect('auto')
-
-    plot_3D_path = os.path.join(write_path, "3D_schema_cluster_" 
-                                + dataset_name 
-                                + "_k=" + str(num_clusters))
-    plt.savefig(plot_3D_path, dpi=300)
-    print("scatter plot written to \"3D_schema_cluster.png\"")
-    return
-
-#=========1=========2=========3=========4=========5=========6=========7=
-#=========1=========2=========3=========4=========5=========6=========7=
-
-# RETURNS: a list of lists, one for each cluster, which contain
-#          attribute, count pairs.  
-def get_cluster_attributes(filename_header_pairs, labels, 
-                           num_clusters, write_path, dataset_name):
-
-    #===================================================================
-    #=#BLOCK#=#: Creates "attr_dicts", a list of dicts, one per cluster,
-    #            which map unique header attributes to their counts in 
-    #            that cluster.   
-    #===================================================================
-    
-    # list of dicts, keys are unique attributes, values are counts
-    # each list corresponds to a cluster
-    attr_dicts = []
-    
-    # initialize each child list. 
-    for k in range(num_clusters):
-        
-        # add k empty dicts
-        attr_dicts.append({})    
-
-    # for each label in labels
-    for i in tqdm(range(len(labels))):
-        
-        # get the corresponding header
-        filename_header_pair = filename_header_pairs[i]
-        header = filename_header_pair[1]
-        
-        # for each attribute in this header
-        for attribute in header:
-            
-            # if it's already in this cluster's dict
-            if attribute in attr_dicts[labels[i]]:
-                old_count = attr_dicts[labels[i]].get(attribute)
-                new_count = old_count + 1
-                
-                # increment the frequency count
-                attr_dicts[labels[i]].update({attribute:new_count})
-            
-            # otherwise, add it to the dict with a count of 1
-            else:
-                attr_dicts[labels[i]].update({attribute:1})    
-
-    #===================================================================
-    #=#BLOCK#=#: Creates "array_list", a list of numpy arrays, each 
-    #            array consists of tuples of attributes and frequencies
-    #            for that cluster, sorted in descending order.  
-    #===================================================================
-
-    # create a list of lists, one for each cluster, containing
-    # 2-tuples where the first element is a unique attribute and the 
-    # second element is an integer representing its frequency in this
-    # cluster
-    clust_attr_lists = []
-    array_list = []
-    max_length = 0
-    
-    # for every attribute dict created above
-    for attr_dict in attr_dicts:
-        
-        # the list of tuples for this cluster
-        clust_attr_list = []
-        
-        # for each key value pair in this dict
-        for attribute, count in attr_dict.items():
-            
-            # add the corresponding tuple to our list
-            clust_attr_list.append([attribute,count])
-        
-        # sort the list in ascending order by frequency
-        clust_attr_list = sorted(clust_attr_list, key=lambda x: x[1])
-        
-        # find the max length list
-        if (max_length < len(clust_attr_list)):
-            max_length = len(clust_attr_list)
-        
-        # add each list to our list of lists
-        clust_attr_lists.append(clust_attr_list)
-        
-        # convert each list to a dataframe
-        attr_df = pd.DataFrame(clust_attr_list)
-        
-        # make it descending order
-        sorted_attr_df = attr_df.iloc[::-1]
-        
-        # convert to numpy array
-        sorted_array = sorted_attr_df.values 
-        
-        # add to list of numpy arrays
-        array_list.append(sorted_array)
-
-
-    #===================================================================
-    #=#BLOCK#=#: Turns "array_list" into one big numpy array, with a set
-    #            of columns for each cluster. Then prints to csv. 
-    #===================================================================
-
-    # this block just adds 0s to each array so they all have the same
-    # length, so that we can put them all in a single array called
-    # "concat". 
-    new_array_list = []
-    for array in array_list:
-        diff = max_length - array.shape[0]
-        if (diff > 0):
-            arr = np.zeros(shape=(diff, 2))
-            array = np.append(array, arr, axis=0)    
-        new_array_list.append(array)
-
-    # create one big array for all clusters, joining all columns
-    concat = np.concatenate(new_array_list, axis=1)
-    
-    # take only the 50 most frequent attributes
-    concat = concat[0:50]
-    concat_df = pd.DataFrame(concat)
-    attribute_path = os.path.join(write_path, "top_50_attributes_" 
-                                  + dataset_name + "_k=" 
-                                  + str(num_clusters) + ".csv") 
-    concat_df.to_csv(attribute_path)  
-    return clust_attr_lists 
 
 #=========1=========2=========3=========4=========5=========6=========7=
 #=========1=========2=========3=========4=========5=========6=========7=
@@ -512,38 +345,38 @@ def runflow(dataset_path, num_clusters,
     #===================================================================
     #=#BLOCK#=#: Get read and write paths for cluster functions 
     #===================================================================
-   
+    print("Getting read and write paths for cluster functions. ")  
+ 
     if overwrite == 'y' or overwrite == 'Y':
         overwrite = "1"
     if overwrite_plot == 'y' or overwrite_plot == 'Y':
         overwrite_plot = "1"
  
     # check if the dataset location is a valid directory 
-    print("Checking if " + dataset_path + " is a valid directory. ")
     check_valid_dir(dataset_path)
    
     # get its absolute path
-    print("Getting the absolute path to the dataset. ") 
     dataset_path = os.path.abspath(dataset_path)
     
     # the name of the top-level directory of the dataset
-    print("Getting the name of the top-level directory of the "
-          + "dataset. ")
-    dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
+    dataset_name = get_last_dir_from_path(dataset_path)
     
-    # Get converted file location and output location
-    print("Getting the location of any and all converted tabular" 
-          + "files. ")
+    # get converted file location and output location
     out_dir = os.path.join(dataset_path, 
                            "../" + "converted-" + dataset_name)
-    write_path = "../outputs/" + dataset_name + "--output/"
+    
+    # define the write path for the entire program
+    write_path = "../../cluster-datalake-outputs/" + dataset_name + "--output/"
+    if not os.path.isdir(write_path):
+        os.system("mkdir " + write_path)
     print("All results printing to " + write_path)
     
-    # Get absolute paths 
+    # get absolute paths 
     out_dir = os.path.abspath(out_dir)
     write_path = os.path.abspath(write_path)
     
     # get the location of the extension index file
+    print("Finding extension index file. ")
     ext_dict_file_loc = os.path.join(write_path, "extension_index_"
                                      + dataset_name + ".npy")
     # check if the above paths are valid
@@ -590,20 +423,30 @@ def runflow(dataset_path, num_clusters,
                            overwrite_plot, write_path, dataset_name)
 
     # plot in 3D
+    print("Plotting clusters in R^3. ")
     plot_clusters(jacc_matrix, labels, write_path, 
                   overwrite_plot, dataset_name, num_clusters)
-
+ 
     # generate results in pdf and text files
-    generate_results(filename_header_pairs, labels, num_clusters, 
-                     dataset_path, write_path, dataset_name)
+    print("Generating results. ")
+    list_cluster_lists = generate_results(filename_header_pairs, 
+                                          labels, 
+                                          num_clusters, 
+                                          dataset_path, 
+                                          write_path, 
+                                          dataset_name)
 
     # get a table of the most common attributes in each cluster
+    print("Getting cluster attributes. ")
     clust_attr_lists = get_cluster_attributes(filename_header_pairs, 
                                               labels, 
                                               num_clusters,
                                               write_path, 
                                               dataset_name) 
     return
+
+#=========1=========2=========3=========4=========5=========6=========7=
+#=========1=========2=========3=========4=========5=========6=========7=
 
 def main():
     
@@ -618,6 +461,9 @@ def main():
     runflow(dataset_path, num_clusters, 
                     overwrite, overwrite_plot, fill_threshold)    
     return
+
+#=========1=========2=========3=========4=========5=========6=========7=
+#=========1=========2=========3=========4=========5=========6=========7=
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here

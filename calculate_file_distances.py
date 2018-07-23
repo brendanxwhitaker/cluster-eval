@@ -42,7 +42,7 @@ def path_dist(path1, path2):
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETER: a path to a directory
-    DOES: checks if the directory alone (not its children) has any FILES '''
+    DOES: checks if the directory alone (not children) has any FILES '''
 def has_files(directory):
     for item in os.listdir(directory):
         if os.path.isfile(os.path.join(directory, item)):
@@ -52,7 +52,7 @@ def has_files(directory):
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETER: a path to a directory
-    RETURNS: a list of the folders with files in them in the directory "path" '''
+    RETURNS: a list of the folders with files in them in "path" '''
 def DFS(path):
     stack = []
     all_dirs = []
@@ -73,7 +73,7 @@ def DFS(path):
 #=========1=========2=========3=========4=========5=========6=========7=
 
 ''' PARAMETER: a directory path
-    RETURNS: Naive max distance according to the above distance metric. '''
+    RETURNS: Naive max distance according to above distance metric. '''
 def naive_max_dist(root):
     max_dist = 0
     all_paths = DFS(root)
