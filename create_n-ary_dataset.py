@@ -76,8 +76,8 @@ def read_seed():
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
-def generate_dataset_txt(dataset_path, num_children, depth, word_list):
-    
+def generate_dataset_txt(dataset_path, num_children, depth, word_list):   
+ 
     if (depth == 1):
         word = random.choice(word_list)
         row_list = []
@@ -139,6 +139,9 @@ def main():
     word_list = read_seed()
     generate_dataset_txt(dataset_path, n, depth, word_list)
     generate_dataset_csv(dataset_path, n, depth, word_list)
+    print("Should have worked. If you see a bunch of copy errors, "
+          + "make sure there are no spaces between words in your "
+          + "seed_words.csv file. ")
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here

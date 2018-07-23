@@ -40,6 +40,9 @@ def load_arguments():
     argparser.add_argument('--overwrite_clusters_text',
             type=str,
             default='n')
+    argparser.add_argument('--minibatch_kmeans',
+            type=str,
+            default='n')
     argparser.add_argument('--num_clusters_start',
             type=int,
             default=10)

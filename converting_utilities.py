@@ -1,10 +1,17 @@
 from bs4 import BeautifulSoup
+from itertools import repeat
 from tqdm import tqdm
+
+import pandas as pd
+import numpy as np
+
 import path_utilities
 import textract
 import DFS
 import sys
+import csv
 import os
+import re
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
@@ -166,10 +173,9 @@ def get_valid_filenames_struct(dir_list):
 # DOES: converts all the files in valid list to csv, and puts the
 #       resultant files in out_dir. 
 def convert_tabular(valid_list, out_dir):
-    for path in tqdm(valid_list):
-        # filename = path_utilities.get_fname_from_path(path)
 
-        # converting
+    for path in tqdm(valid_list):
+
         # output will look like <encoded_filepath_w/_extension>.csv.<i>
         encoded_filename = path_utilities.str_encode(path)
         out_path = os.path.join(out_dir, encoded_filename)
@@ -177,7 +183,37 @@ def convert_tabular(valid_list, out_dir):
             print("out_path: ", out_path)
             print("converting")
             os.system("ssconvert " + path + " " 
-                      + out_path + ".csv > /dev/null 2>&1 -S")
+                      + out_path + ".csv > /dev/null 2>&1 -s")
+    return
+
+#=========1=========2=========3=========4=========5=========6=========7=
+
+def convert_tsv(valid_list, out_dir):
+
+    for path in tqdm(valid_list):
+
+        # output will look like <encoded_filepath_w/_extension>.csv.<i>
+        encoded_filename = path_utilities.str_encode(path)
+        out_path = os.path.join(out_dir, encoded_filename)
+        if not os.path.isfile(out_path + ".csv.0"):
+            print("out_path: ", out_path)
+            print("converting") 
+            with open(path,'r') as tsvin, open(out_path, 'w') as csvout:
+                try:
+                    tsvin = csv.reader(tsvin, delimiter='\t')
+                    csvout = csv.writer(csvout)
+
+                    for row in tsvin:
+                        count = int(row[4])
+                        if count > 0:
+                            csvout.writerows(repeat(row[2:4], count))
+
+                except UnicodeDecodeError:
+                    continue
+                except MemoryError:
+                    print("Memory error, skipping this file. ")
+                    continue
+    return
 
 #=========1=========2=========3=========4=========5=========6=========7=
 
@@ -185,16 +221,20 @@ def convert_tabular(valid_list, out_dir):
 def convert(dataset_path, num_top_exts):
     
     check_valid_dir(dataset_path)
+
     # the name of the top-level directory of the dataset
     dataset_name = path_utilities.get_last_dir_from_path(dataset_path)
+
     # get its absolute path
     dataset_path = os.path.abspath(dataset_path)
     dest = os.path.join(dataset_path, "../converted-" + dataset_name + "/")
     if not os.path.isdir(dest):
         os.system("mkdir " + dest)
     check_valid_dir(dest)
+
     # get the script output location
-    write_path = os.path.join("../outputs/" + dataset_name + "--output/")
+    write_path = os.path.join("../../cluster-datalake-outputs/" + dataset_name + "--output/")
+
     # get its absolute path
     write_path = os.path.abspath(write_path)
     if not os.path.isdir(write_path):
@@ -244,7 +284,7 @@ def convert(dataset_path, num_top_exts):
     if "tsv" in ext_locations:
         tsv_paths = ext_locations.get("tsv")
         valid_tsv = get_valid_filenames_struct(tsv_paths)
-        #convert_tabular(valid_tsv, csv_dest)
+        convert_tsv(valid_tsv, csv_dest)
     
 def main():
     

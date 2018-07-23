@@ -2,7 +2,7 @@ from options import load_arguments
 import converting_utilities
 import document_clustering
 import schema_clustering
-import tokenizer
+import data_composition
 import sys
 import os
 
@@ -20,7 +20,7 @@ def main():
         args.num_clusters_end = args.num_clusters_start
    
     if args.plot_extensions.lower() == 'y':
-        tokenizer.plot_extensions(args.dataset_path,
+        data_composition.plot_extensions(args.dataset_path,
                                   args.num_extensions)
 
     if args.convert.lower() == 'y':
@@ -44,7 +44,8 @@ def main():
             document_clustering.runflow(num_clusters, 
                                         args.overwrite_tokens_text,
                                         args.overwrite_clusters_text,
-                                        args.dataset_path)
+                                        args.dataset_path,
+                                        args.minibatch_kmeans)
         num_clusters += 1
  
 if __name__ == "__main__":
