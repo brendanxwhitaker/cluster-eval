@@ -97,7 +97,7 @@ def generate_results(filename_header_pairs, labels, num_clusters,
     print("Total silhouette for entire clustering: ", sil)
 
     # get the frequency drop score of the clusters
-    freqdrop_scores = compute_freqdrop_score(list_cluster_lists) 
+    freqdrop_scores = compute_freqdrop_score(cluster_directories) 
     freqdrop_total = sum(freqdrop_scores) / len(freqdrop_scores)   
  
     # just make font a bit smaller

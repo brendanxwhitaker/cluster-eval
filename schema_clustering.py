@@ -149,6 +149,11 @@ def get_header_dict(csv_dir, csv_path_list,
                 for attribute in header_list:
                     if not (attribute == ""):
                         num_nonempty = num_nonempty + 1
+                
+                # if the header is still empty, skip file
+                if (len(header_list) == 0):
+                    continue                
+
                 fill_ratio = num_nonempty / len(header_list)                
 
                 # keep checking lines until you get one where there
@@ -322,6 +327,7 @@ def agglomerative(jacc_matrix,
     print("Fitting model to the distance matrix. ")
     clustering.fit(jacc_matrix)
     labels = clustering.labels_
+    print("Done fitting the model. ")
 
     if (overwrite == 1):
         print("Replotting dendrogram. ")
@@ -424,8 +430,8 @@ def runflow(dataset_path, num_clusters,
 
     # plot in 3D
     print("Plotting clusters in R^3. ")
-    plot_clusters(jacc_matrix, labels, write_path, 
-                  overwrite_plot, dataset_name, num_clusters)
+    #plot_clusters(jacc_matrix, labels, write_path, 
+    #              overwrite_plot, dataset_name, num_clusters)
  
     # generate results in pdf and text files
     print("Generating results. ")

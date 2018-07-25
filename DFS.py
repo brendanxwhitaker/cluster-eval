@@ -1,6 +1,6 @@
 import path_utilities
 import numpy as np
-import tokenizer
+import extensions
 import path_utilities
 import sys
 import os
@@ -42,9 +42,9 @@ def extension_indexer(dataset_path, n, write_path):
     filenames = []
     for path in allpaths:
         filenames.append(path_utilities.get_fname_from_path(path))
-    filenames_no_ext, exts = tokenizer.remove_all_extensions(filenames)
+    filenames_no_ext, exts = extensions.remove_all_extensions(filenames)
     
-    sorted_tuple = tokenizer.count_and_sort_exts(exts, n, 
+    sorted_tuple = extensions.count_and_sort_exts(exts, n, 
                                                  write_path, dataset_path)
     sorted_exts, sorted_counts = sorted_tuple
     top_n_exts = sorted_exts[:n]

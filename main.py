@@ -2,7 +2,7 @@ from options import load_arguments
 import converting_utilities
 import document_clustering
 import schema_clustering
-import data_composition
+import extensions
 import sys
 import os
 
@@ -20,7 +20,7 @@ def main():
         args.num_clusters_end = args.num_clusters_start
    
     if args.plot_extensions.lower() == 'y':
-        data_composition.plot_extensions(args.dataset_path,
+        extensions.plot_extensions(args.dataset_path,
                                   args.num_extensions)
 
     if args.convert.lower() == 'y':

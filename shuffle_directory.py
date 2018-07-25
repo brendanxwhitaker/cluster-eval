@@ -1,4 +1,4 @@
-from calculate_file_distances import get_dir_from_path
+from path_utilities import remove_path_end
 import numpy as np
 import DFS
 import sys
@@ -38,7 +38,7 @@ def shuffle(dataset_path):
     # for each file
     for filepath in filepaths:
         # get its parent directory
-        directory = get_dir_from_path(filepath)
+        directory = remove_path_end(filepath)
         # and add it to our list of parent directories
         directory_list.append(directory)
     # generate a permutation of the number of files

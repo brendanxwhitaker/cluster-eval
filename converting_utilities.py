@@ -198,21 +198,25 @@ def convert_tsv(valid_list, out_dir):
         if not os.path.isfile(out_path + ".csv.0"):
             print("out_path: ", out_path)
             print("converting") 
-            with open(path,'r') as tsvin, open(out_path, 'w') as csvout:
-                try:
-                    tsvin = csv.reader(tsvin, delimiter='\t')
-                    csvout = csv.writer(csvout)
+            try:
 
-                    for row in tsvin:
-                        count = int(row[4])
-                        if count > 0:
-                            csvout.writerows(repeat(row[2:4], count))
+                # use 'with' if the program isn't going to immediately terminate
+                # so you don't leave files open
+                # the 'b' is necessary on Windows
+                # it prevents \x1a, Ctrl-z, from ending the stream prematurely
+                # and also stops Python converting to / from different line terminators
+                # On other platforms, it has no effect
+                in_txt = csv.reader(open(path, "r"), delimiter = '\t')
+                out_csv = csv.writer(open(out_path, 'w'))
 
-                except UnicodeDecodeError:
-                    continue
-                except MemoryError:
-                    print("Memory error, skipping this file. ")
-                    continue
+                out_csv.writerows(in_txt)
+                if not os.path.isfile(out_path):
+                    print("Did not save converted .tsv correctly. ")
+            except UnicodeDecodeError:
+                continue
+            except MemoryError:
+                print("Memory error, skipping this file. ")
+                continue
     return
 
 #=========1=========2=========3=========4=========5=========6=========7=

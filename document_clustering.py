@@ -22,6 +22,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import MDS
 from mpl_toolkits.mplot3d import Axes3D
 
+import frequencydrop
 import silhouette
 import path_utilities
 
@@ -107,8 +108,7 @@ def tokenize_and_stem(text):
                filtered_tokens.append(token)
     
     # stems the tokens
-    stems = [stemmer.stem(t) for t in filtered_tokens]
-    
+    stems = [stemmer.stem(t) for t in filtered_tokens]    
     return filtered_tokens, stems
 
 ''' PARAMETER: the text of a document
@@ -142,16 +142,20 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
     # "dataset" is a list of strings, each containing a document's text
     fnames, dataset = get_document_contents(corpusdir, dataset_path)
     
+    # if trying to skip tokenization, check for dependencies 
     if retokenize == "0":
-        print("\nAttempting to bypass retokenizing...")
+        print("\nAttempting to bypass tokenizing...")
         vf = os.path.join(file_place, "vocab_frame_" + dataset_name + ".pkl")
         tms = os.path.join(file_place, "terms_" + dataset_name + ".npy")
         dm = os.path.join(file_place, "distance_matrix_" + dataset_name + ".npy")
         tf = os.path.join(file_place, "tfidf_matrix_" + dataset_name + ".npy")
 
+        # if any dependency is missing, set to retokenize
         if not os.path.isfile(vf) or not os.path.isfile(tms) or not os.path.isfile(dm) or not os.path.isfile(tf):
-            print("One or more dependencies is missing... \nRetokenizing...")
+            print("One or more dependencies is missing... \nTokenizing...")
             retokenize = "1"
+        else:
+            print("Success!")
             
     if retokenize == "1":     
         print("\nTokenizing", len(dataset), "documents...")
@@ -164,7 +168,7 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
             totalvocab_stemmed.extend(allwords_stemmed) 
             totalvocab_tokenized.extend(allwords_tokenized)
 
-        # create vocab_frame with "totalvocab_stemmed" or "totalvocab_tokenized"
+        # vocab_frame contains all tokens mapped to their stemmed counterparts
         vocab_frame = pd.DataFrame({'words': totalvocab_tokenized}, 
                     index = totalvocab_stemmed)
         vocab_frame.to_pickle(os.path.join(file_place, "vocab_frame_" + dataset_name + ".pkl"))
@@ -180,9 +184,12 @@ def to_retokenize(retokenize, corpusdir, dataset_path):
         tfidf_matrix = tfidf_vectorizer.fit_transform(dataset) 
         print("matrix", tfidf_matrix)
         np.save(os.path.join(file_place, "tfidf_matrix_" + dataset_name + ".npy"), tfidf_matrix)
+        
+        # the list of all feature names (tokens)
         terms = tfidf_vectorizer.get_feature_names()
-        print("length ofh t erms", len(terms))
         np.save(os.path.join(file_place, "terms_" + dataset_name + ".npy"), terms)
+        
+        # distance matrix from the tfidf matrix
         dist = 1 - cosine_similarity(tfidf_matrix)
         np.save(os.path.join(file_place, "distance_matrix_" + dataset_name + ".npy"), dist)
         print("Vectorizer fitted to data")
@@ -197,30 +204,36 @@ def to_recluster(num_clusters, retokenize, recluster, tfidf_matrix, dataset_path
     dataset_name, file_place = initialize_output_location(dataset_path)
     trailer_text = dataset_name + "_k=" + str(num_clusters)
    
+    # if try to bypass clustering, check for dependencies
     if recluster == "0":
-        print("\nAttempting to bypass reclustering...") 
+        print("\nAttempting to bypass clustering...") 
         dc = os.path.join(file_place, "doc_cluster_" + trailer_text + ".pkl")
         
+        # if dependency is missing, set to cluster
         if not os.path.isfile(dc):
-            print("\"doc_cluster_" + trailer_text + ".pkl\" is missing... \nReclustering...")
+            print("\"doc_cluster_" + trailer_text + ".pkl\" is missing... \nClustering...")
             recluster = "1"
+        else:
+            print("Success!")
 
+        # if retokenize and recluster are 0, only regenerates graphs
         if retokenize == "0":
-            print("\nNo output if not retokenizing or reclustering. Please try again. \nExiting...")
-            exit()
+            print("\nNote: Running without overwriting tokens or clusters only regenerates graphs and text output.")
     
+    # if retokenizing, you must recluster
     if retokenize == "1":
         recluster = "1"
 
     if recluster == "1":
         clustert0 = time()
-        # cluster using KMeans on the tfidf matrix
-        print("\nClustering using kmeans with k = " + str(num_clusters) + "...")
         
+        # cluster using KMeans on the tfidf matrix
         if minibatch == "1":
             km = MiniBatchKMeans(n_clusters=num_clusters)
+            print("\nClustering using minibatch kmeans with k = " + str(num_clusters) + "...")
         else:
             km = KMeans(n_clusters=num_clusters, n_jobs=-1)
+            print("\nClustering using kmeans with k = " + str(num_clusters) + "...") 
         
         km.fit(tfidf_matrix)
         print("Kmeans clustering complete")
@@ -241,8 +254,8 @@ def to_recluster(num_clusters, retokenize, recluster, tfidf_matrix, dataset_path
              "distinct_cluster_labels" - list of distinct cluster labels '''
 def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, n_words, minibatch):
     #stopwords = nltk.download('stopwords')
-
     #nltk.download('punkt')
+
     stemmer = SnowballStemmer("english")
 
     dataset_name, file_place = initialize_output_location(dataset_path)
@@ -251,20 +264,22 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
     print("\nAll outputs generated will be in \"~\\cluster-datalake-outputs\\" + dataset_name + "--output\"")
 
     #=========1=========2=========3=========4=========5=========6=======
-    
+
+    # tokenize and cluster    
     fnames, dataset = to_retokenize(retokenize, corpusdir, dataset_path)
     tfidf_matrix = np.load(os.path.join(file_place, "tfidf_matrix_" + dataset_name + ".npy")).item()
     to_recluster(num_clusters, retokenize, recluster, tfidf_matrix, dataset_path, minibatch)
     
+    # load in existing saved files
     km = joblib.load(os.path.join(file_place, 'doc_cluster_' + trailer_text + '.pkl'))
     vocab_frame = pd.read_pickle(os.path.join(file_place, "vocab_frame_" + dataset_name + ".pkl"))
     terms = np.load(os.path.join(file_place, "terms_" + dataset_name + ".npy")).tolist()
     dist = np.load(os.path.join(file_place, "distance_matrix_" + dataset_name + ".npy"))
-    print("\nLoaded in existing cluster profile...\n")
+    print("\nLoaded in existing dependencies...\n")
 
     clusters = km.labels_.tolist()
-    # get the actual number of clusters in the dataframe, in case some
-    # are omitted for some reason
+
+    # get the actual number of clusters in the dataframe
     distinct_cluster_labels = []
     for label in clusters:
         if label not in distinct_cluster_labels:
@@ -290,11 +305,6 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
     #sort cluster centers by proximity to centroid
     order_centroids = km.cluster_centers_.argsort()[:, ::-1] 
    
-    #print("Printing the index. ")
-    #print(frame.index)
-    #print(vocab_frame.to_string())   
-    #print("true number of clusters: ", true_num_clusters)
-
     all_cluster_words = {}
     # for each cluster
 
@@ -312,22 +322,15 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
         fwriter.write("Cluster " + str(i) + " words: ")
         print("Cluster %d words:" % i, end='')
         
-        cluster_words = []
-        for ind in order_centroids[i, :]: 
-            test_var = vocab_frame.ix[terms[ind].split(" ")].values.tolist()[0]
-            cluster_words.append(test_var[0])
-        cluster_words = unique(cluster_words)
-        
+        cluster_words = [] 
+        seen = []
         # print the first "n_words" words in a cluster
-        #for ind in order_centroids[i, : n_words]:
-        for ind in range(min(n_words, len(cluster_words))):
-            #print("fuck mylife -  ")
+        for ind in order_centroids[i, : n_words]:
             #test_var = vocab_frame.ix[terms[ind].split(" ")].values.tolist()[0]
-            print(' %s' % cluster_words[ind], end=",")  
-            fwriter.write(cluster_words[ind].rstrip("\n") + ", ")
-            #print(' %s' % vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0], end=",")
-            #fwriter.write(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].rstrip('\n') + ", ")
-            #cluster_words.append(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0])
+            
+            print(' %s' % vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0], end=",")
+            fwriter.write(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].rstrip('\n') + ", ")
+            cluster_words.append(vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0])
         print()
         fwriter.write("\n")
          
@@ -347,10 +350,16 @@ def main_function(num_clusters, retokenize, recluster, corpusdir, dataset_path, 
 
     #=========1=========2=========3=========4=========5=========6========
     
-    # multidimensional scaling: convert distance matrix into 3-dimensions
-    mds = MDS(n_components=3, dissimilarity="precomputed", random_state=1)
-    print("\nFitting the distance matrix into 3 dimensions...")
-    pos = mds.fit_transform(dist)  # shape (n_components, n_samples)
+    if retokenize == "1":
+        print("\nBypassing MDS fitting...") 
+        # multidimensional scaling: convert distance matrix into 3-dimensions
+        mds = MDS(n_components=3, dissimilarity="precomputed", random_state=1)
+        print("\nFitting the distance matrix into 3 dimensions...")
+        pos_save = mds.fit_transform(dist)  # shape (n_components, n_samples)
+        np.save(os.path.join(file_place, "mds_pos_" + trailer_text + ".npy"), pos_save)
+
+    print("Loaded existing MDS fit.")
+    pos = np.load(os.path.join(file_place, "mds_pos_" + trailer_text + ".npy")).item()
     xs, ys, zs = pos[:, 0], pos[:, 1], pos[:, 2]
 
     # set up plot
@@ -485,15 +494,21 @@ def print_cluster_stats(frame, top_words, dataset_path, num_clusters):
     
     fr = open(os.path.join(file_place, "cluster_stats_" + trailer_text + ".txt"), "w")
     total_silhouette, scores = silhouette.compute_silhouette(cluster_directories, dataset_path)
+    frqscores = frequencydrop.compute_freqdrop_score(cluster_directories)
+    total_frq_score = sum(frqscores)/len(frqscores)
     num_files_per_cluster = frame['cluster'].value_counts().sort_index().tolist()
 
     print("\n\nComputing cluster statistics...")
     for clust_num in tqdm(range(len(cluster_directories))):
-        c_stats = "Cluster " + str(clust_num) + "\n" + str(num_files_per_cluster[clust_num]) + " files \n"
+        c_stats = "Cluster " + str(clust_num) + "\n"
+        c_stats = c_stats + str(num_files_per_cluster[clust_num]) + " files \n"
         c_stats = c_stats + get_cluster_stats(cluster_directories[clust_num])
-        c_stats = c_stats + "\nSilhouette score: " + str(scores[clust_num]) + "\nTop 10 words: " + ", ".join(top_words.get(clust_num))
+        c_stats = c_stats + "\nSilhouette score: " + str(scores[clust_num])
+        c_stats = c_stats + "\nFrequency drop score: " + str(frqscores[clust_num])
+        c_stats = c_stats + "\nTop 10 words: " + ", ".join(top_words.get(clust_num))
         fr.write(c_stats + "\n\n")
     fr.write("\nTotal silhouette score: " + str(total_silhouette))
+    fr.write("Average frequency drop score: " + str(total_frq_score))
     fr.close()
     print("Cluster stats written to \"cluster_stats_" + trailer_text + ".txt\"")
 

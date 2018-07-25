@@ -14,7 +14,7 @@ import os
 
 # RETURNS: a list of the frequencydrop scores of each of the clusters,
 #          and a total, the average of all these scores. 
-def compute_freqdrop_score(list_cluster_lists):
+def compute_freqdrop_score(cluster_directories):
 
     # list of scores, total score
     freqdrop_scores = []
@@ -23,12 +23,9 @@ def compute_freqdrop_score(list_cluster_lists):
     j = 0
     
     # iterate over directory, frequency lists 
-    for cluster_list in list_cluster_lists:
+    for path_counts in cluster_directories:
          
         freqdrop_score = 0
-
-        # get frequencies of the paths
-        path_counts = Counter(cluster_list)
         
         # Create a dataframe from path_counts        
         df = pd.DataFrame.from_dict(path_counts, orient='index')
@@ -82,7 +79,7 @@ def compute_freqdrop_score(list_cluster_lists):
     freqdrop_total = sum(freqdrop_scores)/len(freqdrop_scores)
     print("Total frequency drop score: ", freqdrop_total)
 
-    return freqdrop_score
+    return freqdrop_scores
 
 #=========1=========2=========3=========4=========5=========6=========7=
 #=========1=========2=========3=========4=========5=========6=========7=
